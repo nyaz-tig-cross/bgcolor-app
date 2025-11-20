@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>背景色変更アプリ (統合版)</title>
+    
+    <style>
+        /* CSSコード */
+        body {
+            transition: background-color 0.5s ease;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #ffffff; /* 初期値 */
+            color: #333;
+        }
+
+        h1 {
+            color: #007bff;
+            margin-bottom: 30px;
+        }
+
+        .container {
+            margin-bottom: 20px;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        #color-input {
+            padding: 10px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 200px;
+        }
+
+        #apply-button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #apply-button:hover {
+            background-color: #0056b3;
+        }
+
+        .info-box {
+            border: 2px solid #007bff;
+            padding: 15px;
+            border-radius: 8px;
+            width: 300px;
+            text-align: left;
+            background-color: white;
+        }
+
+        .info-box p {
+            margin: 5px 0;
+        }
+
+        .info-box span {
+            font-weight: bold;
+            color: #d9534f;
+        }
+    </style>
+</head>
+<body>
+    <h1>背景色変更アプリ</h1>
+
+    <div class="container">
+        <label for="color-input">Webセーフカラーを入力 (例: #FF3366, 3366CC, black, etc.):</label>
+        <input type="text" id="color-input" placeholder="#RRGGBB または RRGGBB">
+        <button id="apply-button">背景色を適用</button>
+    </div>
+
+    <div class="info-box">
+        <p>現在の背景色: <span id="current-color">#FFFFFF</span></p>
+        <p>カラーネーム: <span id="color-name">white</span></p>
+        <p>RGB (10進数): <span id="rgb-value">rgb(255, 255, 255)</span></p>
+    </div>
+
+    <script>
+        // JavaScriptコード
+        document.addEventListener('DOMContentLoaded', () => {
+            const colorInput = document.getElementById('color-input');
+            const applyButton = document.getElementById('apply-button');
+            const body = document.body;
+            const currentColorDisplay = document.getElementById('current-color');
+            const colorNameDisplay = document.getElementById('color-name');
+            const rgbValueDisplay = document.getElementById('rgb-value');
+
+            // Webセーフカラーの辞書 (一部抜粋)
+            const webSafeColors = {
+                '#FFFFFF': 'white', '#000000': 'black', '#FF0000': 'red', '#00FF00': 'lime', 
+                '#0000FF': 'blue', '#FFFF00': 'yellow', '#00FFFF': 'aqua/cyan', '#FF00FF': 'fuchsia/magenta',
+                
+                // Webセーフカラー (6進数が 00, 33, 66, 99, CC, FF の組み合わせ)
+                '#FF6600': 'orange', '#66FF33': 'chartreuse', '#33CCFF': 'sky blue',
+                
+                // カラーネーム対応 (Webセーフ外のものも含まれますが、利便性のために含めます)
+                'red': '#FF0000', 'blue': '#0000FF', 'green': '#008000', 'yellow': '#FFFF00',
+                'white': '#FFFFFF', 'black': '#000000', 'gray': '#808080', 'silver': '#C0C0C0'
+            };
+            
+            // カラーネームからHEXコードへの逆引きマップを作成
+            const colorNameToHex = {};
+            for (const [hex, name] of Object.entries(webSafeColors)) {
+                // 複数の名前がある場合 (aqua/cyan) に対応
+                name.split('/').forEach(n => {
+                    colorNameToHex[n.toLowerCase()] = hex;
+                });
+            }
+
+
+            /**
+             * HEX形式の色コードをRGB (10進数) の文字列に変換する
+             * @param {string} hex - #RRGGBB 形式の色コード
+             * @returns {string} - rgb(R, G, B) 形式の文字列
+             */
+            function hexToRgbString(hex) {
+                // #を削除し、大文字に変換
+                const cleanHex = hex.startsWith('#') ? hex.substring(1).toUpperCase() : hex.toUpperCase();
+
+                // 6桁か確認
+                if (cleanHex.length !== 6) {
+                    return '無効なHEXコード';
+                }
+
+                const r = parseInt(cleanHex.substring(0, 2), 16);
+                const g = parseInt(cleanHex.substring(2, 4), 16);
+                const b = parseInt(cleanHex.substring(4, 6), 16);
+
+                // 各成分が0-255の範囲内であることを確認
+                if (isNaN(r) || isNaN(g) || isNaN(b)) {
+                    return '無効なHEXコード';
+                }
+
+                return `rgb(${r}, ${g}, ${b})`;
+            }
+
+            /**
+             * 入力された値から、HEXコード、カラーネーム、RGB値を処理して表示を更新する
+             */
+            function applyColor() {
+                let input = colorInput.value.trim().toLowerCase();
+                let hexColor = '';
+                let colorName = '該当なし';
+                let rgbValue = '無効な入力';
+
+                // 1. カラーネームでの入力チェック
+                if (colorNameToHex[input]) {
+                    hexColor = colorNameToHex[input];
+                    // webSafeColorsから対応する名前を再検索
+                    colorName = webSafeColors[hexColor] || input; 
+                } 
+                // 2. HEXコード (#RRGGBB または RRGGBB) での入力チェック
+                else {
+                    let potentialHex = input.startsWith('#') ? input.toUpperCase() : `#${input.toUpperCase()}`;
+                    
+                    // 3桁の短縮形にも対応 (例: #F00 -> #FF0000)
+                    if (potentialHex.length === 4) {
+                        const r = potentialHex[1];
+                        const g = potentialHex[2];
+                        const b = potentialHex[3];
+                        potentialHex = `#${r}${r}${g}${g}${b}${b}`;
+                    }
+
+                    if (/^#[0-9A-F]{6}$/i.test(potentialHex)) {
+                        hexColor = potentialHex;
+                        const normalizedHex = hexColor.toUpperCase();
+
+                        if (webSafeColors[normalizedHex]) {
+                            colorName = webSafeColors[normalizedHex];
+                        }
+                    } else {
+                        // 無効な入力として処理を終了
+                        body.style.backgroundColor = '#FFFFFF';
+                        currentColorDisplay.textContent = '無効な入力';
+                        colorNameDisplay.textContent = '該当なし';
+                        rgbValueDisplay.textContent = '無効な入力';
+                        return;
+                    }
+                }
+
+                // 背景色の適用と情報の更新
+                if (hexColor) {
+                    body.style.backgroundColor = hexColor;
+                    currentColorDisplay.textContent = hexColor;
+                    rgbValue = hexToRgbString(hexColor);
+
+                    colorNameDisplay.textContent = colorName;
+                    rgbValueDisplay.textContent = rgbValue;
+                }
+            }
+
+            // ボタンクリックまたはEnterキーで色を適用
+            applyButton.addEventListener('click', applyColor);
+            colorInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    applyColor();
+                }
+            });
+
+            // 初期状態の表示を更新 (DOMContentLoadedの処理後に実行されるため、bodyの初期色と一致させる)
+            currentColorDisplay.textContent = '#FFFFFF';
+            colorNameDisplay.textContent = webSafeColors['#FFFFFF'];
+            rgbValueDisplay.textContent = hexToRgbString('#FFFFFF');
+        });
+    </script>
+</body>
+</html>
